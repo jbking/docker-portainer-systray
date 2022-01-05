@@ -1,8 +1,11 @@
-const { app, Menu, Tray, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, shell, MessageChannelMain, nativeImage } = require('electron');
 const { exec } = require('child_process');
 
+let icon = null;
 let tray = null;
 let items = null;
+
+let rendererPort = null;
 
 const checkState = () => {
   exec('docker ps --format "{{.ID}} {{.Names}}"', (error, stdout, stderr) => {
@@ -15,18 +18,41 @@ const checkState = () => {
       const a = l.split(' ');
       items.push({ label: a[1], click: () => shell.openExternal("http://localhost:9000/#!/1/docker/containers/" + a[0]) });
     }
-    items.push({ type: 'separator' });
-    items.push({ label: 'Exit', role: 'quit' });
-    tray.setContextMenu(Menu.buildFromTemplate(items));
+    menuItems = [...items]
+    menuItems.push({ type: 'separator' });
+    menuItems.push({ label: 'Exit', role: 'quit' });
+    tray.setContextMenu(Menu.buildFromTemplate(menuItems));
     // console.log('items', items);
+    rendererPort.postMessage({ icon: icon.toPNG(), count: items.length })
   });
 }
 
-app.whenReady().then(() => {
-  const iconPath = __dirname + '/share/icon/docker.png';
-  tray = new Tray(iconPath);
-  tray.setTitle(app.name);
+app.whenReady().then(async () => {
+  icon = nativeImage.createFromPath(__dirname + '/share/icon/docker.png');
+
+  const renderer = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      preload: `${__dirname}/preload.js`,
+    }
+  });
+  await renderer.loadFile('renderer.html')
+  renderer.openDevTools()
+
+  const { port1, port2 } = new MessageChannelMain()
+  renderer.webContents.postMessage('new-client', null, [port1])
+  rendererPort = port2
+
+  rendererPort.on('message', (event) => {
+    const icon1 = nativeImage.createFromBuffer(event.data.icon)
+    tray.setImage(icon1)
+  })
+  rendererPort.start()
+
+  tray = new Tray(icon);
 
   checkState();
-  setInterval(checkState, 5000);
+  setInterval(checkState, 3000);
 });
