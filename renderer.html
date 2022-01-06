@@ -45,7 +45,7 @@ window.ipcRenderer.on('new-client', (event) => {
       onImage = new Uint8Array(await b1.arrayBuffer());
     }
 
-    if (count > 1) {
+    if (count > 0) {
       port.postMessage({ icon: onImage })
     } else {
       port.postMessage({ icon: offImage })

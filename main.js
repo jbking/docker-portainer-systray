@@ -3,9 +3,10 @@ const { exec } = require('child_process');
 
 let icon = null;
 let tray = null;
-let items = null;
 
 let rendererPort = null;
+
+let lastState = null;
 
 const checkState = () => {
   exec('docker ps --format "{{.ID}} {{.Names}}"', (error, stdout, stderr) => {
@@ -13,17 +14,56 @@ const checkState = () => {
       console.error(`exec error: ${error}`);
       return;
     }
-    items = [];
-    for (let l of stdout.trim().split('\n')) {
-      const a = l.split(' ');
-      items.push({ label: a[1], click: () => shell.openExternal("http://localhost:9000/#!/1/docker/containers/" + a[0]) });
+
+    // when same state from last command
+    if (stdout === lastState) {
+      return;
     }
-    menuItems = [...items]
-    menuItems.push({ type: 'separator' });
-    menuItems.push({ label: 'Exit', role: 'quit' });
+    lastState = stdout;
+
+    let isPortainerActive = false;
+    containers = [];
+    console.log(`stdout: >${stdout}<`);
+    for (let l of stdout.trim().split('\n')) {
+      if (l.trim().length == 0) {
+        continue;
+      }
+      const a = l.split(' ');
+      if (a[1].indexOf("portainer") >= 0) {
+        isPortainerActive = true;
+        continue;
+      }
+      containers.push({ id: a[0], label: a[1] });
+    }
+
+    console.log('isPortainerActive', isPortainerActive);
+    console.log('containers', containers);
+  
+    menuItems = [];
+    if (isPortainerActive) {
+      menuItems.push(
+        { label: 'Open Portainer', click: () => shell.openExternal("http://localhost:9000/#!/1/docker/containers") },
+        { type: 'separator' },
+        { label: `Containers (${containers.length})`, submenu: containers.map((c) => ({
+          label: c.label,
+          click: () => shell.openExternal("http://localhost:9000/#!/1/docker/containers/" + c.id) })) },
+      )
+    } else {
+      menuItems.push(
+        { label: 'Portainer is not running' },
+        { type: 'separator' },
+        { label: `Containers (${containers.length})`, submenu: containers.map((c) => ({ label: c.label })) },
+      )
+    }
+    menuItems.push(
+      { type: 'separator' },
+      { label: 'Exit', role: 'quit' },
+    );
+
+    console.log('menuItems', menuItems);
     tray.setContextMenu(Menu.buildFromTemplate(menuItems));
     // console.log('items', items);
-    rendererPort.postMessage({ icon: icon.toPNG(), count: items.length })
+    rendererPort.postMessage({ icon: icon.toPNG(), count: containers.length })
   });
 }
 
