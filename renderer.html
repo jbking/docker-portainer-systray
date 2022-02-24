@@ -1,6 +1,5 @@
 <script>
-let offImage = null;
-let onImage = null;
+let images = [];
 
 const loadImage = (src) => {
   return new Promise((resolve, reject) => {
@@ -11,45 +10,67 @@ const loadImage = (src) => {
   });
 }
 
+const levels = [
+  0,  // 0 No container(except portainer)
+  5,  // 1 ~ 5 OK
+  10, // 6 ~ 10 Warn
+      // 11 ~ Attention
+];
+const levelColors = [
+  // use original without mark as no containers
+  "green",
+  "yellow",
+  "red"
+];
+
+
 window.ipcRenderer.on('new-client', (event) => {
   // console.log('new-client', event);
-  const [ port ] = event.ports
+  const [ port ] = event.ports;
   port.onmessage = async (event) => {
-    const count = event.data.count
+    const count = event.data.count;
 
-    if (offImage === null) {
-      offImage = event.data.icon
-    }
+    // init
+    if (images.length === 0) {
+      images.push(event.data.icon);
 
-    if (onImage === null) {
+      // loading source image
       const b = new Blob([event.data.icon], { type: 'image/png' });
       const img = await loadImage(URL.createObjectURL(b));
-      URL.revokeObjectURL(img.src)
+      URL.revokeObjectURL(img.src);
 
-      const canvas = document.getElementById('canvas')
-      canvas.setAttribute('width', img.width)
-      canvas.setAttribute('height', img.height)
-      ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0)
-      ctx.fillStyle = 'red'
+      const canvas = document.getElementById('canvas');
+      canvas.setAttribute('width', img.width);
+      canvas.setAttribute('height', img.height);
+      const ctx = canvas.getContext('2d');
 
-      const radius = 30
-      const x = img.width - radius
-      const y = img.height - radius
-      ctx.beginPath()
-      ctx.arc(x, y, radius, 0, 2 * Math.PI)
-      ctx.fill()
+      // generate images with mark
+      for (let i = 0; i < levels.length; i++) {
+        ctx.drawImage(img, 0, 0);
+        ctx.fillStyle = levelColors[i];
 
-      const b1 = await new Promise(resolve => canvas.toBlob(resolve));
+        const radius = 30;
+        const x = img.width - radius;
+        const y = img.height - radius;
 
-      onImage = new Uint8Array(await b1.arrayBuffer());
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fill();
+
+        const b1 = await new Promise(resolve => canvas.toBlob(resolve));
+        const image = new Uint8Array(await b1.arrayBuffer());
+        images.push(image);
+      }
     }
 
-    if (count > 0) {
-      port.postMessage({ icon: onImage })
-    } else {
-      port.postMessage({ icon: offImage })
+    let i = 0;
+    for (;i < levels.length; i++) {
+      if (count <= levels[i]) {
+        break;
+      } 
     }
+
+    port.postMessage({ icon: images[i] });
   }
 })
 </script>
