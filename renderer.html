@@ -16,6 +16,8 @@ const levels = [
   10, // 6 ~ 10 Warn
       // 11 ~ Attention
 ];
+const outlineColor = "dark-gray";
+const outlineWidth = 3;
 const levelColors = [
   // use original without mark as no containers
   "green",
@@ -56,6 +58,11 @@ window.ipcRenderer.on('new-client', (event) => {
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
         ctx.fill();
+
+        ctx.lineWidth = outlineWidth;
+        ctx.strokeStyle = outlineColor;
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.stroke();
 
         const b1 = await new Promise(resolve => canvas.toBlob(resolve));
         const image = new Uint8Array(await b1.arrayBuffer());
