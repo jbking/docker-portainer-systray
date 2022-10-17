@@ -1,7 +1,7 @@
 {
-  "name": "docker-systray",
+  "name": "docker-portainer-systray",
   "version": "1.0.0",
-  "description": "",
+  "description": "A small utility shows the status of docker containers on the local environment and opens the portainer page.",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
